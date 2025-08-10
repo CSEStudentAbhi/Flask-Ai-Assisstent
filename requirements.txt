@@ -3,6 +3,7 @@ Flask
 Flask-CORS
 Werkzeug
 dotenv
+flask-cors
 # AI and Language Models
 langchain
 langchain-community 
@@ -12,3 +13,4 @@ langchain-groq
 requests
 # Additional Utilities
 typing-extensions
+
