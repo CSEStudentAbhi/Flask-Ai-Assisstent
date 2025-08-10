@@ -1,0 +1,14 @@
+# Core Flask and Web Framework
+Flask
+Flask-CORS
+Werkzeug
+dotenv
+# AI and Language Models
+langchain
+langchain-community 
+langchain-core
+langchain-groq
+# HTTP Requests (for periodic requests and monitoring)
+requests
+# Additional Utilities
+typing-extensions
