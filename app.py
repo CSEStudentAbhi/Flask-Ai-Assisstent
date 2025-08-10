@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template_string
+from flask_cors import CORS  # Import CORS
 import os
 from portfolio_chatbot import PortfolioChatbot
 from dotenv import load_dotenv
@@ -8,6 +9,9 @@ import json
 load_dotenv()
 
 app = Flask(__name__)
+
+# Enable CORS for all routes, allowing all origins
+CORS(app)  # This allows all origins by default.
 
 # Global chatbot instance
 chatbot = None
@@ -706,6 +710,7 @@ def api_docs():
         "version": "1.0.0",
         "description": "RESTful API for interacting with Abhishek Ambi's portfolio chatbot",
         "base_url": request.host_url + "api",
+        "cors": "Enabled for all origins. Contact admin for specific origin restrictions.",
         "endpoints": {
             "health": {
                 "method": "GET",
