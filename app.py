@@ -283,14 +283,7 @@ HTML_TEMPLATE = """
             </div>
             
             <div class="sidebar">
-                # <div class="api-info">
-                #     <h4>🔗 API Access</h4>
-                #     <p>REST API available at:</p>
-                #     <code>POST /api/ask</code><br>
-                #      <code>GET /api/projects</code><br>
-                #      <code>GET /api/skills</code><br>
-                #      <code>GET /api/docs</code>
-                # </div>
+               
                 
                 <h3>Quick Actions</h3>
                 <button class="btn btn-secondary" onclick="quickAction('Tell me about Abhishek\\'s background')">👤 Background</button>
@@ -810,3 +803,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
