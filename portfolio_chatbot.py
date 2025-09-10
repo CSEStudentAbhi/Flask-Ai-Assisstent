@@ -88,6 +88,9 @@ Abhishek Gangappa Ambi is a final year computer science student with practical e
 
 **Personal Journey**:
 - Born and raised in Mahalingpur, Karnataka
+- Date of birth 15/06/2003
+- Gender Male
+- Satus Single
 - Started educational journey at Jaycee English Medium School
 - Completed SSLC in 2020 with 64% marks
 - Pursued Diploma in Computer Science (2020-2023) with excellent performance (9.83 CGPA)
