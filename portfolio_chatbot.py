@@ -17,7 +17,7 @@ class PortfolioChatbot:
     that can answer questions about projects and provide career advice.
     """
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gemma2-9b-it", debug: bool = False):
+    def __init__(self, api_key: Optional[str] = None, model: str = "llama-3.1-8b-instant", debug: bool = False):
         """
         Initialize the portfolio chatbot.
         
