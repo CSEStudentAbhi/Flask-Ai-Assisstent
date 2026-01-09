@@ -4,9 +4,10 @@ import time
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 from langchain_core.prompts import PromptTemplate
-from langchain.chains import LLMChain
+from langchain_core.output_parsers import StrOutputParser
 from langchain_groq import ChatGroq
-from langchain.globals import set_debug, set_verbose
+from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain.globals import set_debug, set_verbose
 
 # Load environment variables
 load_dotenv()
@@ -27,21 +28,32 @@ class PortfolioChatbot:
             debug: Enable debug mode for LangChain
         """
         self.api_key = api_key or os.getenv('GROQ_API_KEY')
+        self.gemini_api_key = os.getenv('GEMINI_API_KEY')
+        
         if not self.api_key:
-            raise ValueError("API key not found. Please set GROQ_API_KEY environment variable or pass it directly.")
+            print("⚠️ GROQ_API_KEY not found. Attempting to use GEMINI_API_KEY if available.")
         
         self.original_model = model
         self.current_model = model
-        self.llm = ChatGroq(model=model, api_key=self.api_key)
+        self.provider = "groq" # track current provider
         
+        # Initialize LLM
+        if self.api_key:
+            self.llm = ChatGroq(model=model, api_key=self.api_key)
+        elif self.gemini_api_key:
+            self._switch_to_gemini()
+        else:
+             raise ValueError("No valid API keys found. Please set GROQ_API_KEY or GEMINI_API_KEY.")
+
         # Model switching variables
         self.model_switch_time = None
         self.switch_duration = 1800  # 30 minutes in seconds
         
         # Set debug mode if requested
         if debug:
-            set_verbose(True)
-            set_debug(True)
+            pass
+            # set_verbose(True)
+            # set_debug(True)
         
         # Initialize the chain
         self._setup_chain()
@@ -53,10 +65,8 @@ class PortfolioChatbot:
             template=self._get_prompt_template()
         )
         
-        self.chain = LLMChain(
-            llm=self.llm,
-            prompt=self.prompt_template,
-        )
+        # LCEL Chain: Prompt -> LLM -> Output Parser
+        self.chain = self.prompt_template | self.llm | StrOutputParser()
     
     def _get_prompt_template(self) -> str:
         """Get the prompt template with system and knowledge base."""
@@ -300,11 +310,34 @@ User Query: "{user_input}"
 
 Answer:
 '''
-    
+
+    def _switch_to_gemini(self):
+        """Switch to Gemini API."""
+        if not self.gemini_api_key:
+            print("❌ Cannot switch to Gemini: GEMINI_API_KEY not found.")
+            return False
+        
+        try:
+            print("🔄 Switching to Gemini model (gemini-2.5-flash)...")
+            self.current_model = "gemini-2.5-flash"
+            self.provider = "google"
+            self.llm = ChatGoogleGenerativeAI(
+                model=self.current_model, 
+                google_api_key=self.gemini_api_key,
+                convert_system_message_to_human=True
+            )
+            self._setup_chain()
+            print(f"✅ Switched to defined Gemini model: {self.current_model}")
+            return True
+        except Exception as e:
+            print(f"❌ Error switching to Gemini: {e}")
+            return False
+
     def _switch_model(self, new_model: str):
-        """Switch to a different model."""
+        """Switch to a different model (assumes Groq by default unless specified)."""
         try:
             self.current_model = new_model
+            self.provider = "groq"
             self.llm = ChatGroq(model=new_model, api_key=self.api_key)
             self._setup_chain()
             print(f"🔄 Switched to model: {new_model}")
@@ -317,7 +350,11 @@ Answer:
             time.time() - self.model_switch_time >= self.switch_duration and
             self.current_model != self.original_model):
             
-            self._switch_model(self.original_model)
+            # Switch back to Groq original model
+            self.current_model = self.original_model
+            self.provider = "groq"
+            self.llm = ChatGroq(model=self.original_model, api_key=self.api_key)
+            self._setup_chain()
             self.model_switch_time = None
             print(f"🔄 Switched back to original model: {self.original_model}")
     
@@ -335,26 +372,33 @@ Answer:
         self._check_and_switch_back()
         
         try:
-            result = self.chain.run({"user_input": question})
+            result = self.chain.invoke({"user_input": question})
             return result.strip()
         except Exception as e:
             error_str = str(e).lower()
+            print(f"⚠️ Error encountered: {e}")
             
-            # Handle rate limit errors by switching model
-            if 'rate limit' in error_str or '429' in error_str or 'tpd' in error_str:
-                if self.current_model == "gemma2-9b-it":
-                    print("⚠️ Rate limit reached for gemma2-9b-it, switching to compound-beta-mini")
-                    self._switch_model("compound-beta-mini")
-                    self.model_switch_time = time.time()
-                    
-                    # Try the request again with the new model
-                    try:
-                        result = self.chain.run({"user_input": question})
-                        return result.strip()
-                    except Exception as retry_error:
-                        return f"Sorry, I encountered an error even after switching models: {str(retry_error)}"
-                else:
-                    return f"Sorry, I encountered a rate limit error: {str(e)}"
+            # Handle rate limit errors
+            is_rate_limit = 'rate limit' in error_str or '429' in error_str or 'tpd' in error_str or 'resource exhausted' in error_str
+            
+            if is_rate_limit:
+                print("⚠️ Rate limit or resource exhaustion detected.")
+                
+                # If currently on Groq, try switching to Gemini
+                if self.provider == "groq":
+                    print("⚠️ Groq limit hit. Attempting fallback to Gemini...")
+                    if self._switch_to_gemini():
+                        self.model_switch_time = time.time()
+                        try:
+                            result = self.chain.invoke({"user_input": question})
+                            return result.strip()
+                        except Exception as retry_error:
+                            return f"Sorry, I encountered an error even with Gemini: {str(retry_error)}"
+                
+                # If on Groq (and Gemini failed) or already on Gemini, maybe switch Groq models?
+                # Previous logic had a switch between Groq models (gemma2-9b-it -> compound-beta-mini)
+                # We can keep that as a secondary fallback if Gemini fails or isn't available?
+                # For now, let's prioritize Gemini as requested.
             
             return f"Sorry, I encountered an error: {str(e)}"
     
